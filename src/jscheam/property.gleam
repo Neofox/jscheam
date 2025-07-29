@@ -1,4 +1,13 @@
+import gleam/json
 import gleam/option
+
+/// Constraints that can be applied to properties
+pub type Constraint {
+  /// Restrict values to a fixed set of values (can be any JSON value)
+  Enum(values: List(json.Json))
+  /// Pattern constraint using regex 
+  Pattern(regex: String)
+}
 
 /// A property in a JSON Schema object
 pub type Property {
@@ -7,6 +16,7 @@ pub type Property {
     property_type: Type,
     is_required: Bool,
     description: option.Option(String),
+    constraints: List(Constraint),
   )
 }
 

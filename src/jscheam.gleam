@@ -2,9 +2,9 @@ import gleam/json
 import gleam/list
 import gleam/option
 import jscheam/property.{
-  type AdditionalProperties, type Property, type Type, AllowAny, AllowExplicit,
-  Array, Boolean, Disallow, Float, Integer, Null, Object, Property, Schema,
-  String, Union,
+  type AdditionalProperties, type Constraint, type Property, type Type, AllowAny,
+  AllowExplicit, Array, Boolean, Disallow, Enum, Float, Integer, Null, Object,
+  Pattern, Property, Schema, String, Union,
 }
 
 // Property builders
@@ -16,6 +16,7 @@ pub fn prop(name: String, property_type: Type) -> Property {
     property_type: property_type,
     is_required: True,
     description: option.None,
+    constraints: [],
   )
 }
 
@@ -64,6 +65,13 @@ pub fn array(item_type: Type) -> Type {
 /// Example: union([string(), null()]) creates a schema that accepts both strings and null values
 pub fn union(types: List(Type)) -> Type {
   Union(types)
+}
+
+/// Adds an enum constraint to a property that restricts values to a fixed set
+/// Example: prop("color", string()) |> enum(enum_strings(["red", "green", "blue"]))
+pub fn enum(property: Property, values: List(json.Json)) -> Property {
+  let new_constraint = Enum(values: values)
+  Property(..property, constraints: [new_constraint, ..property.constraints])
 }
 
 /// Creates an object type with the specified properties
@@ -157,69 +165,100 @@ fn type_to_json_value(property_type: Type) -> json.Json {
 }
 
 fn property_to_field(property: Property) -> #(String, json.Json) {
-  let Property(name, property_type, _is_required, description) = property
-  let base_schema = type_to_json_value(property_type)
+  let Property(name, property_type, _is_required, description, constraints) =
+    property
 
-  // Add description if provided
-  let schema_with_description = case description {
-    option.Some(desc) -> {
-      case base_schema {
-        _ -> {
-          case property_type {
-            String | Integer | Boolean | Float | Null ->
-              json.object([
-                #("type", json.string(type_to_type_string(property_type))),
-                #("description", json.string(desc)),
-              ])
-            Array(item_type) ->
-              json.object([
-                #("type", json.string(type_to_type_string(property_type))),
-                #("items", type_to_json_value(item_type)),
-                #("description", json.string(desc)),
-              ])
-            Object(properties: props, additional_properties: add_props) -> {
-              let properties_json =
-                list.map(props, property_to_field) |> json.object
-              let required_json = fields_to_required(props)
-              let additional_props_fields =
-                additional_properties_to_json(add_props)
-
-              let base_fields = [
-                #("type", json.string(type_to_type_string(property_type))),
-                #("properties", properties_json),
-                #("required", required_json),
-                #("description", json.string(desc)),
-              ]
-
-              json.object(list.append(base_fields, additional_props_fields))
-            }
-            Union(types) -> {
-              let type_strings = list.map(types, type_to_type_string)
-              json.object([
-                #("type", json.array(type_strings, json.string)),
-                #("description", json.string(desc)),
-              ])
-            }
-          }
-        }
-      }
-    }
-    option.None -> base_schema
+  let base_fields = get_base_type_fields(property_type)
+  let fields_with_constraints = add_constraint_fields(base_fields, constraints)
+  let final_fields = case description {
+    option.Some(desc) -> [
+      #("description", json.string(desc)),
+      ..fields_with_constraints
+    ]
+    option.None -> fields_with_constraints
   }
 
-  #(name, schema_with_description)
+  #(name, json.object(final_fields))
+}
+
+fn get_base_type_fields(property_type: Type) -> List(#(String, json.Json)) {
+  case property_type {
+    String | Integer | Boolean | Null | Float -> [
+      #("type", json.string(type_to_type_string(property_type))),
+    ]
+    Array(item_type) -> [
+      #("type", json.string(type_to_type_string(property_type))),
+      #("items", type_to_json_value(item_type)),
+    ]
+    Object(properties: props, additional_properties: add_props) -> {
+      let properties_json = list.map(props, property_to_field) |> json.object
+      let required_json = fields_to_required(props)
+      let additional_props_fields = additional_properties_to_json(add_props)
+
+      let base_fields = [
+        #("type", json.string(type_to_type_string(property_type))),
+        #("properties", properties_json),
+        #("required", required_json),
+      ]
+
+      list.append(base_fields, additional_props_fields)
+    }
+    Union(types) -> {
+      let type_strings = list.map(types, type_to_type_string)
+      [#("type", json.array(type_strings, json.string))]
+    }
+  }
+}
+
+fn add_constraint_fields(
+  base_fields: List(#(String, json.Json)),
+  constraints: List(Constraint),
+) -> List(#(String, json.Json)) {
+  case constraints {
+    [] -> base_fields
+    [constraint, ..rest] -> {
+      let fields_with_constraint =
+        add_single_constraint_field(base_fields, constraint)
+      add_constraint_fields(fields_with_constraint, rest)
+    }
+  }
+}
+
+fn add_single_constraint_field(
+  fields: List(#(String, json.Json)),
+  constraint: Constraint,
+) -> List(#(String, json.Json)) {
+  case constraint {
+    Enum(values: values) -> [
+      #("enum", json.array(values, fn(x) { x })),
+      ..fields
+    ]
+    Pattern(regex: regex) -> [#("pattern", json.string(regex)), ..fields]
+  }
 }
 
 fn fields_to_required(fields: List(Property)) -> json.Json {
   let required_fields =
     list.filter(fields, fn(property) {
-      let Property(_name, _property_type, is_required, _description) = property
+      let Property(
+        _name,
+        _property_type,
+        is_required,
+        _description,
+        _constraints,
+      ) = property
       is_required
     })
 
   let names =
     list.map(required_fields, fn(property) {
-      let Property(name, _property_type, _is_required, _description) = property
+      let Property(
+        name,
+        _property_type,
+        _is_required,
+        _description,
+        _constraints,
+      ) = property
       json.string(name)
     })
   json.array(names, fn(x) { x })
