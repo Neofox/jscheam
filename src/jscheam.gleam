@@ -3,7 +3,8 @@ import gleam/list
 import gleam/option
 import jscheam/property.{
   type AdditionalProperties, type Property, type Type, AllowAny, AllowExplicit,
-  Array, Boolean, Disallow, Float, Integer, Object, Property, Schema, String,
+  Array, Boolean, Disallow, Float, Integer, Null, Object, Property, Schema,
+  String, Union,
 }
 
 // Property builders
@@ -49,9 +50,20 @@ pub fn float() -> Type {
   Float
 }
 
+/// Creates a null type for JSON Schema
+pub fn null() -> Type {
+  Null
+}
+
 /// Creates an array type with the specified item type
 pub fn array(item_type: Type) -> Type {
   Array(item_type)
+}
+
+/// Creates a union type that accepts multiple types (e.g., string or null)
+/// Example: union([string(), null()]) creates a schema that accepts both strings and null values
+pub fn union(types: List(Type)) -> Type {
+  Union(types)
 }
 
 /// Creates an object type with the specified properties
@@ -101,19 +113,31 @@ fn additional_properties_to_json(
   }
 }
 
+fn type_to_type_string(property_type: Type) -> String {
+  case property_type {
+    String -> "string"
+    Integer -> "number"
+    Boolean -> "boolean"
+    Null -> "null"
+    Float -> "number"
+    Object(_, _) -> "object"
+    Array(_) -> "array"
+    Union(_) ->
+      panic as "Union types should not be converted to single type strings"
+  }
+}
+
 fn type_to_json_value(property_type: Type) -> json.Json {
   case property_type {
-    String -> json.object([#("type", json.string("string"))])
-    Integer -> json.object([#("type", json.string("number"))])
-    Boolean -> json.object([#("type", json.string("boolean"))])
-    Float -> json.object([#("type", json.string("number"))])
+    String | Integer | Boolean | Null | Float ->
+      json.object([#("type", json.string(type_to_type_string(property_type)))])
     Object(properties: props, additional_properties: add_props) -> {
       let properties_json = list.map(props, property_to_field) |> json.object
       let required_json = fields_to_required(props)
       let additional_props_fields = additional_properties_to_json(add_props)
 
       let base_fields = [
-        #("type", json.string("object")),
+        #("type", json.string(type_to_type_string(property_type))),
         #("properties", properties_json),
         #("required", required_json),
       ]
@@ -122,9 +146,13 @@ fn type_to_json_value(property_type: Type) -> json.Json {
     }
     Array(item_type) ->
       json.object([
-        #("type", json.string("array")),
+        #("type", json.string(type_to_type_string(property_type))),
         #("items", type_to_json_value(item_type)),
       ])
+    Union(types) -> {
+      let type_strings = list.map(types, type_to_type_string)
+      json.object([#("type", json.array(type_strings, json.string))])
+    }
   }
 }
 
@@ -138,29 +166,14 @@ fn property_to_field(property: Property) -> #(String, json.Json) {
       case base_schema {
         _ -> {
           case property_type {
-            String ->
+            String | Integer | Boolean | Float | Null ->
               json.object([
-                #("type", json.string("string")),
-                #("description", json.string(desc)),
-              ])
-            Integer ->
-              json.object([
-                #("type", json.string("number")),
-                #("description", json.string(desc)),
-              ])
-            Boolean ->
-              json.object([
-                #("type", json.string("boolean")),
-                #("description", json.string(desc)),
-              ])
-            Float ->
-              json.object([
-                #("type", json.string("number")),
+                #("type", json.string(type_to_type_string(property_type))),
                 #("description", json.string(desc)),
               ])
             Array(item_type) ->
               json.object([
-                #("type", json.string("array")),
+                #("type", json.string(type_to_type_string(property_type))),
                 #("items", type_to_json_value(item_type)),
                 #("description", json.string(desc)),
               ])
@@ -172,13 +185,20 @@ fn property_to_field(property: Property) -> #(String, json.Json) {
                 additional_properties_to_json(add_props)
 
               let base_fields = [
-                #("type", json.string("object")),
+                #("type", json.string(type_to_type_string(property_type))),
                 #("properties", properties_json),
                 #("required", required_json),
                 #("description", json.string(desc)),
               ]
 
               json.object(list.append(base_fields, additional_props_fields))
+            }
+            Union(types) -> {
+              let type_strings = list.map(types, type_to_type_string)
+              json.object([
+                #("type", json.array(type_strings, json.string)),
+                #("description", json.string(desc)),
+              ])
             }
           }
         }

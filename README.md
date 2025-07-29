@@ -178,11 +178,6 @@ let json_schema = jscheam.to_json(profile_schema) |> json.to_string()
 
 ## TODO: Future Features
 
-### Tuples
-
-- Support for tuple types with fixed-length arrays and specific item types at each position
-- Example: `tuple([string(), null()])`
-
 ### Restrictions
 
 - **String restrictions**:
@@ -192,12 +187,6 @@ let json_schema = jscheam.to_json(profile_schema) |> json.to_string()
   - `minimum(n)` / `maximum(n)` - Value range constraints
 - **Array restrictions**:
   - `min_items(n)` / `max_items(n)` - Array length constraints
-
-### Null Type
-
-- Support for nullable types and null values
-- `nullable(type)` - Makes a type nullable
-- `null()` - Explicit null type
 
 ## Development
 

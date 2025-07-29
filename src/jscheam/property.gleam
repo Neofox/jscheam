@@ -29,9 +29,12 @@ pub type Type {
   String
   Boolean
   Float
+  Null
   Object(
     properties: List(Property),
     additional_properties: AdditionalProperties,
   )
   Array(Type)
+  /// Union type for multiple allowed types (e.g., ["string", "null"])
+  Union(List(Type))
 }

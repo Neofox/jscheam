@@ -3,7 +3,7 @@ import gleam/string
 import gleeunit
 import gleeunit/should
 import jscheam
-import jscheam/property.{Array, Boolean, Float, Integer, String}
+import jscheam/property.{Array, Boolean, Float, Integer, Null, String, Union}
 
 pub fn main() -> Nil {
   gleeunit.main()
@@ -164,5 +164,28 @@ pub fn type_constructors_test() {
   jscheam.integer() |> should.equal(Integer)
   jscheam.boolean() |> should.equal(Boolean)
   jscheam.float() |> should.equal(Float)
+  jscheam.null() |> should.equal(Null)
   jscheam.array(jscheam.string()) |> should.equal(Array(String))
+  jscheam.union([jscheam.string(), jscheam.null()])
+  |> should.equal(Union([String, Null]))
+}
+
+pub fn union_type_test() {
+  let schema =
+    jscheam.object([
+      jscheam.prop("units", jscheam.union([jscheam.string(), jscheam.null()]))
+      |> jscheam.description("Units the temperature will be returned in."),
+    ])
+
+  let json = jscheam.to_json(schema) |> json.to_string()
+
+  string.contains(json, "\"type\":\"object\"") |> should.be_true()
+  string.contains(json, "\"units\":{\"type\":[\"string\",\"null\"]")
+  |> should.be_true()
+  string.contains(
+    json,
+    "\"description\":\"Units the temperature will be returned in.\"",
+  )
+  |> should.be_true()
+  string.contains(json, "\"required\":[\"units\"]") |> should.be_true()
 }
