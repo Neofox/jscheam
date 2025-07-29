@@ -2,8 +2,8 @@ import gleam/json
 import gleam/list
 import gleam/option
 import jscheam/property.{
-  type Property, type Type, Array, Boolean, Float, Integer, Object, Property,
-  String,
+  type AdditionalProperties, type Property, type Type, AllowAny, AllowExplicit,
+  Array, Boolean, Disallow, Float, Integer, Object, Property, Schema, String,
 }
 
 // Property builders
@@ -55,9 +55,50 @@ pub fn array(item_type: Type) -> Type {
 }
 
 /// Creates an object type with the specified properties
-/// Set additional_properties to True to allow additional properties beyond those defined
-pub fn object(properties: List(Property), additional_properties: Bool) -> Type {
-  Object(properties: properties, additional_properties: additional_properties)
+/// By default allows any additional properties (JSON Schema default behavior - omits the field)
+pub fn object(properties: List(Property)) -> Type {
+  Object(properties: properties, additional_properties: AllowAny)
+}
+
+/// Explicitly allows any additional properties (outputs "additionalProperties": true)
+pub fn allow_additional_props(object_type: Type) -> Type {
+  case object_type {
+    Object(properties: props, additional_properties: _) ->
+      Object(properties: props, additional_properties: AllowExplicit)
+    _ -> object_type
+  }
+}
+
+/// Disallows additional properties (outputs "additionalProperties": false)
+pub fn disallow_additional_props(object_type: Type) -> Type {
+  case object_type {
+    Object(properties: props, additional_properties: _) ->
+      Object(properties: props, additional_properties: Disallow)
+    _ -> object_type
+  }
+}
+
+/// Constrains additional properties to conform to the specified schema
+pub fn constrain_additional_props(object_type: Type, schema: Type) -> Type {
+  case object_type {
+    Object(properties: props, additional_properties: _) ->
+      Object(properties: props, additional_properties: Schema(schema))
+    _ -> object_type
+  }
+}
+
+fn additional_properties_to_json(
+  add_props: AdditionalProperties,
+) -> List(#(String, json.Json)) {
+  case add_props {
+    AllowAny -> []
+    // Omit the field entirely (JSON Schema default)
+    AllowExplicit -> [#("additionalProperties", json.bool(True))]
+    Disallow -> [#("additionalProperties", json.bool(False))]
+    Schema(schema_type) -> [
+      #("additionalProperties", type_to_json_value(schema_type)),
+    ]
+  }
 }
 
 fn type_to_json_value(property_type: Type) -> json.Json {
@@ -69,12 +110,15 @@ fn type_to_json_value(property_type: Type) -> json.Json {
     Object(properties: props, additional_properties: add_props) -> {
       let properties_json = list.map(props, property_to_field) |> json.object
       let required_json = fields_to_required(props)
-      json.object([
+      let additional_props_fields = additional_properties_to_json(add_props)
+
+      let base_fields = [
         #("type", json.string("object")),
         #("properties", properties_json),
         #("required", required_json),
-        #("additionalProperties", json.bool(add_props)),
-      ])
+      ]
+
+      json.object(list.append(base_fields, additional_props_fields))
     }
     Array(item_type) ->
       json.object([
@@ -124,13 +168,17 @@ fn property_to_field(property: Property) -> #(String, json.Json) {
               let properties_json =
                 list.map(props, property_to_field) |> json.object
               let required_json = fields_to_required(props)
-              json.object([
+              let additional_props_fields =
+                additional_properties_to_json(add_props)
+
+              let base_fields = [
                 #("type", json.string("object")),
                 #("properties", properties_json),
                 #("required", required_json),
-                #("additionalProperties", json.bool(add_props)),
                 #("description", json.string(desc)),
-              ])
+              ]
+
+              json.object(list.append(base_fields, additional_props_fields))
             }
           }
         }

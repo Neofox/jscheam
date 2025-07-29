@@ -38,12 +38,12 @@ let json_schema = jscheam.to_json(name_schema) |> json.to_string()
 import jscheam
 import gleam/json
 
-// Create an object with properties
+// Create an object with default additional properties behavior (allows any)
 let user_schema = jscheam.object([
   jscheam.prop("name", jscheam.string()),
   jscheam.prop("age", jscheam.integer()),
   jscheam.prop("email", jscheam.string())
-], additional_properties: False)
+])
 
 let json_schema = jscheam.to_json(user_schema) |> json.to_string()
 // Result: {
@@ -53,9 +53,29 @@ let json_schema = jscheam.to_json(user_schema) |> json.to_string()
 //     "age": {"type": "number"},
 //     "email": {"type": "string"}
 //   },
-//   "required": ["name", "age", "email"],
-//   "additionalProperties": false
+//   "required": ["name", "age", "email"]
+//   // Note: additionalProperties is omitted (defaults to true as per JSON Schema Draft 7)
 // }
+
+// Create an object with strict additional properties 
+let strict_user_schema = jscheam.object([jscheam.prop("name", jscheam.string())])
+  |> jscheam.disallow_additional_props()
+  |> jscheam.to_json(strict_user_schema) |> json.to_string()
+// Result: {..., "additionalProperties": false}
+
+// Create an object with constrained additional properties 
+let constrained_user_schema = jscheam.object([jscheam.prop("id", jscheam.string())])
+  |> jscheam.constrain_additional_props(jscheam.string())
+  |> jscheam.to_json(constrained_user_schema) |> json.to_string()
+// Result: {..., "additionalProperties": {"type": "string"}}
+
+// Explicitly allow additional properties
+let explicit_allow_schema = jscheam.object([
+  jscheam.prop("name", jscheam.string())
+]) 
+|> jscheam.allow_additional_props()
+|> jscheam.to_json(explicit_allow_schema) |> json.to_string()
+// Result: {..., "additionalProperties": true}
 ```
 
 ### Optional Properties and Descriptions
@@ -80,8 +100,7 @@ let json_schema = jscheam.to_json(user_schema) |> json.to_string()
 //     "age": {"type": "number"},
 //     "email": {"type": "string", "description": "User's email address"}
 //   },
-//   "required": ["name"],
-//   "additionalProperties": false
+//   "required": ["name"]
 // }
 ```
 
@@ -128,6 +147,33 @@ let profile_schema = jscheam.object([
 ])
 
 let json_schema = jscheam.to_json(profile_schema) |> json.to_string()
+// Result: {
+//   "type": "object",
+//   "properties": {
+//     "user": {
+//       "type": "object",
+//       "properties": {
+//         "name": {"type": "string"},
+//         "age": {"type": "number"}
+//       },
+//       "required": ["name"]
+//     },
+//     "preferences": {
+//       "type": "object",
+//       "properties": {
+//         "theme": {"type": "string", "description": "UI theme preference"},
+//         "notifications": {"type": "boolean"}
+//       },
+//       "required": ["theme"]
+//     },
+//     "tags": {
+//       "type": "array",
+//       "items": {"type": "string"},
+//       "description": "User tags"
+//     }
+//   },
+//   "required": ["user", "preferences"]
+// }
 ```
 
 ## TODO: Future Features
