@@ -34,34 +34,34 @@ gleam add jscheam
 ### Basic Types
 
 ```gleam
-import jscheam
+import jscheam/schema
 import gleam/json
 
 // Create simple types
-let name_schema = jscheam.string()
-let age_schema = jscheam.integer()
-let active_schema = jscheam.boolean()
-let score_schema = jscheam.float()
+let name_schema = schema.string()
+let age_schema = schema.integer()
+let active_schema = schema.boolean()
+let score_schema = schema.float()
 
 // Generate JSON Schema
-let json_schema = jscheam.to_json(name_schema) |> json.to_string()
+let json_schema = schema.to_json(name_schema) |> json.to_string()
 // Result: {"type":"string"}
 ```
 
 ### Object Schemas
 
 ```gleam
-import jscheam
+import jscheam/schema
 import gleam/json
 
 // Create an object with default additional properties behavior (allows any)
-let user_schema = jscheam.object([
-  jscheam.prop("name", jscheam.string()),
-  jscheam.prop("age", jscheam.integer()),
-  jscheam.prop("email", jscheam.string())
+let user_schema = schema.object([
+  schema.prop("name", schema.string()),
+  schema.prop("age", schema.integer()),
+  schema.prop("email", schema.string())
 ])
 
-let json_schema = jscheam.to_json(user_schema) |> json.to_string()
+let json_schema = schema.to_json(user_schema) |> json.to_string()
 // Result: {
 //   "type": "object",
 //   "properties": {
@@ -70,45 +70,45 @@ let json_schema = jscheam.to_json(user_schema) |> json.to_string()
 //     "email": {"type": "string"}
 //   },
 //   "required": ["name", "age", "email"]
-//   // Note: additionalProperties is omitted (defaults to true as per JSON Schema Draft 7)
+// Note: additionalProperties is omitted (defaults to true as per JSON Schema Draft 7)
 // }
 
-// Create an object with strict additional properties 
-let strict_user_schema = jscheam.object([jscheam.prop("name", jscheam.string())])
-  |> jscheam.disallow_additional_props()
-  |> jscheam.to_json(strict_user_schema) |> json.to_string()
+// Create an object with strict additional properties
+let strict_user_schema = schema.object([schema.prop("name", schema.string())])
+  |> schema.disallow_additional_props()
+  |> schema.to_json(strict_user_schema) |> json.to_string()
 // Result: {..., "additionalProperties": false}
 
-// Create an object with constrained additional properties 
-let constrained_user_schema = jscheam.object([jscheam.prop("id", jscheam.string())])
-  |> jscheam.constrain_additional_props(jscheam.string())
-  |> jscheam.to_json(constrained_user_schema) |> json.to_string()
+// Create an object with constrained additional properties
+let constrained_user_schema = schema.object([schema.prop("id", schema.string())])
+  |> schema.constrain_additional_props(schema.string())
+  |> schema.to_json(constrained_user_schema) |> json.to_string()
 // Result: {..., "additionalProperties": {"type": "string"}}
 
 // Explicitly allow additional properties
-let explicit_allow_schema = jscheam.object([
-  jscheam.prop("name", jscheam.string())
-]) 
-|> jscheam.allow_additional_props()
-|> jscheam.to_json(explicit_allow_schema) |> json.to_string()
+let explicit_allow_schema = schema.object([
+  schema.prop("name", schema.string())
+])
+|> schema.allow_additional_props()
+|> schema.to_json(explicit_allow_schema) |> json.to_string()
 // Result: {..., "additionalProperties": true}
 ```
 
 ### Optional Properties and Descriptions
 
 ```gleam
-import jscheam
+import jscheam/schema
 import gleam/json
 
-let user_schema = jscheam.object([
-  jscheam.prop("name", jscheam.string()) |> jscheam.description("User's full name"),
-  jscheam.prop("age", jscheam.integer()) |> jscheam.optional(),
-  jscheam.prop("email", jscheam.string())
-    |> jscheam.description("User's email address")
-    |> jscheam.optional()
+let user_schema = schema.object([
+  schema.prop("name", schema.string()) |> schema.description("User's full name"),
+  schema.prop("age", schema.integer()) |> schema.optional(),
+  schema.prop("email", schema.string())
+    |> schema.description("User's email address")
+    |> schema.optional()
 ])
 
-let json_schema = jscheam.to_json(user_schema) |> json.to_string()
+let json_schema = schema.to_json(user_schema) |> json.to_string()
 // Result: {
 //   "type": "object",
 //   "properties": {
@@ -123,21 +123,21 @@ let json_schema = jscheam.to_json(user_schema) |> json.to_string()
 ### Arrays
 
 ```gleam
-import jscheam
+import jscheam/schema
 import gleam/json
 
 // Array of strings
-let tags_schema = jscheam.array(jscheam.string())
+let tags_schema = schema.array(schema.string())
 
 // Array of objects
-let users_schema = jscheam.array(
-  jscheam.object([
-    jscheam.prop("name", jscheam.string()),
-    jscheam.prop("age", jscheam.integer()) |> jscheam.optional()
+let users_schema = schema.array(
+  schema.object([
+    schema.prop("name", schema.string()),
+    schema.prop("age", schema.integer()) |> schema.optional()
   ])
 )
 
-let json_schema = jscheam.to_json(tags_schema) |> json.to_string()
+let json_schema = schema.to_json(tags_schema) |> json.to_string()
 // Result: {
 //   "type": "array",
 //   "items": {"type": "string"}
@@ -147,23 +147,24 @@ let json_schema = jscheam.to_json(tags_schema) |> json.to_string()
 ### Union Types
 
 Union types allow a property to accept multiple types.
-Some API require all fields to be required (no optional fields), so the only way to add nullability is to use union types.
+Some API require all fields to be "required"" (no optional fields),
+so the only way to add nullability is to use union types.
 
 ```gleam
-import jscheam
+import jscheam/schema
 import gleam/json
 
 // Simple union: string or null
-let nullable_string_schema = jscheam.union([jscheam.string(), jscheam.null()])
+let nullable_string_schema = schema.union([schema.string(), schema.null()])
 
 // Used in an object
-let user_schema = jscheam.object([
-  jscheam.prop("name", jscheam.string()),
-  jscheam.prop("nickname", jscheam.union([jscheam.string(), jscheam.null()]))
-    |> jscheam.description("Optional nickname, can be string or null")
+let user_schema = schema.object([
+  schema.prop("name", schema.string()),
+  schema.prop("nickname", schema.union([schema.string(), schema.null()]))
+    |> schema.description("Optional nickname, can be string or null")
 ])
 
-let json_schema = jscheam.to_json(user_schema) |> json.to_string()
+let json_schema = schema.to_json(user_schema) |> json.to_string()
 // Result: {
 //   "type": "object",
 //   "properties": {
@@ -179,40 +180,42 @@ let json_schema = jscheam.to_json(user_schema) |> json.to_string()
 
 ### Constraints
 
-Constraints allow you to add validation rules to your schema properties. jscheam supports enum and pattern constraints with more to come in the future.
+Constraints allow you to add validation rules to your schema properties.
+jscheam supports enum and pattern constraints with more to come in the future.
 
 #### Enum Constraints
 
-Enum constraints restrict values to a fixed set of allowed values. It uses the `json` module to define the allowed values. as enum values can be any valid JSON type (string, number, boolean, null, ...)
+Enum constraints restrict values to a fixed set of allowed values.
+It uses the `json` module to define the allowed values as enum values can be any valid JSON type (string, number, boolean, null, ...)
 
 ```gleam
-import jscheam
+import jscheam/schema
 import gleam/json
 
 // String enum
-let color_schema = jscheam.object([
-  jscheam.prop("color", jscheam.string())
-  |> jscheam.enum([
+let color_schema = schema.object([
+  schema.prop("color", schema.string())
+  |> schema.enum([
     json.string("red"),
-    json.string("green"), 
+    json.string("green"),
     json.string("blue")
   ])
-  |> jscheam.description("Primary colors only")
+  |> schema.description("Primary colors only")
 ])
 
 // Mixed type enum with union
-let status_schema = jscheam.object([
-  jscheam.prop("status", jscheam.union([jscheam.string(), jscheam.null(), jscheam.integer()]))
-  |> jscheam.enum([
+let status_schema = schema.object([
+  schema.prop("status", schema.union([schema.string(), schema.null(), schema.integer()]))
+  |> schema.enum([
     json.string("active"),
     json.string("inactive"),
     json.null(),
     json.int(42)
   ])
-  |> jscheam.description("Status with mixed types")
+  |> schema.description("Status with mixed types")
 ])
 
-let json_schema = jscheam.to_json(color_schema) |> json.to_string()
+let json_schema = schema.to_json(color_schema) |> json.to_string()
 // Result: {
 //   "type": "object",
 //   "properties": {
@@ -235,19 +238,19 @@ import jscheam
 import gleam/json
 
 // Email validation
-let user_schema = jscheam.object([
-  jscheam.prop("email", jscheam.string())
-  |> jscheam.pattern("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
-  |> jscheam.description("Valid email address"),
-  
-  jscheam.prop("phone", jscheam.string())
-  |> jscheam.pattern("^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$")
-  |> jscheam.description("Phone number in US format")
+let user_schema = schema.object([
+  schema.prop("email", schema.string())
+  |> schema.pattern("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+  |> schema.description("Valid email address"),
+
+  schema.prop("phone", schema.string())
+  |> schema.pattern("^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$")
+  |> schema.description("Phone number in US format")
 ])
 
-let json_schema = jscheam.to_json(user_schema) |> json.to_string()
+let json_schema = schema.to_json(user_schema) |> json.to_string()
 // Result: {
-//   "type": "object", 
+//   "type": "object",
 //   "properties": {
 //     "email": {
 //       "type": "string",
@@ -255,7 +258,7 @@ let json_schema = jscheam.to_json(user_schema) |> json.to_string()
 //       "description": "Valid email address"
 //     },
 //     "phone": {
-//       "type": "string", 
+//       "type": "string",
 //       "pattern": "^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$",
 //       "description": "Phone number in US format"
 //     }
@@ -270,19 +273,19 @@ let json_schema = jscheam.to_json(user_schema) |> json.to_string()
 import jscheam
 import gleam/json
 
-let profile_schema = jscheam.object([
-  jscheam.prop("user", jscheam.object([
-    jscheam.prop("name", jscheam.string()),
-    jscheam.prop("age", jscheam.integer()) |> jscheam.optional()
+let profile_schema = schema.object([
+  schema.prop("user", schema.object([
+    schema.prop("name", schema.string()),
+    schema.prop("age", schema.integer()) |> schema.optional()
   ])),
-  jscheam.prop("preferences", jscheam.object([
-    jscheam.prop("theme", jscheam.string()) |> jscheam.description("UI theme preference"),
-    jscheam.prop("notifications", jscheam.boolean()) |> jscheam.optional()
+  schema.prop("preferences", schema.object([
+    schema.prop("theme", schema.string()) |> schema.description("UI theme preference"),
+    schema.prop("notifications", schema.boolean()) |> schema.optional()
   ])),
-  jscheam.prop("tags", jscheam.array(jscheam.string())) |> jscheam.description("User tags")
+  schema.prop("tags", schema.array(schema.string())) |> schema.description("User tags")
 ])
 
-let json_schema = jscheam.to_json(profile_schema) |> json.to_string()
+let json_schema = schema.to_json(profile_schema) |> json.to_string()
 // Result: {
 //   "type": "object",
 //   "properties": {

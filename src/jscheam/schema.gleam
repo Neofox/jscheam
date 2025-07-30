@@ -1,33 +1,29 @@
 import gleam/json
 import gleam/list
 import gleam/option
-import jscheam/property.{
-  type AdditionalProperties, type Constraint, type Property, type Type, AllowAny,
-  AllowExplicit, Array, Boolean, Disallow, Enum, Float, Integer, Null, Object,
-  Pattern, Property, Schema, String, Union,
+
+/// Constraints that can be applied to properties
+pub type Constraint {
+  /// Restrict values to a fixed set of values (can be any JSON value)
+  Enum(values: List(json.Json))
+  /// Pattern constraint using regex
+  Pattern(regex: String)
 }
 
-// Property builders
-/// Creates a property with the specified name and type
-/// Properties are required by default
-pub fn prop(name: String, property_type: Type) -> Property {
-  Property(
-    name: name,
-    property_type: property_type,
-    is_required: True,
-    description: option.None,
-    constraints: [],
+/// A type definition for JSON Schema
+pub type Type {
+  Integer
+  String
+  Boolean
+  Float
+  Null
+  Object(
+    properties: List(Property),
+    additional_properties: AdditionalProperties,
   )
-}
-
-/// Makes a property optional (not required in the schema)
-pub fn optional(property: Property) -> Property {
-  Property(..property, is_required: False)
-}
-
-/// Adds a description to a property for documentation purposes
-pub fn description(property: Property, desc: String) -> Property {
-  Property(..property, description: option.Some(desc))
+  Array(Type)
+  /// Union type for multiple allowed types (e.g., ["string", "null"])
+  Union(List(Type))
 }
 
 // Type builders
@@ -67,20 +63,6 @@ pub fn union(types: List(Type)) -> Type {
   Union(types)
 }
 
-/// Adds an enum constraint to a property that restricts values to a fixed set
-/// Example: prop("color", string()) |> enum(enum_strings(["red", "green", "blue"]))
-pub fn enum(property: Property, values: List(json.Json)) -> Property {
-  let new_constraint = Enum(values: values)
-  Property(..property, constraints: [new_constraint, ..property.constraints])
-}
-
-/// Adds a pattern constraint to a property that restricts values to match a regex pattern
-/// Example: prop("phone", string()) |> pattern("^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$")
-pub fn pattern(property: Property, regex: String) -> Property {
-  let new_constraint = Pattern(regex: regex)
-  Property(..property, constraints: [new_constraint, ..property.constraints])
-}
-
 /// Creates an object type with the specified properties
 /// By default allows any additional properties (JSON Schema default behavior - omits the field)
 pub fn object(properties: List(Property)) -> Type {
@@ -114,12 +96,73 @@ pub fn constrain_additional_props(object_type: Type, schema: Type) -> Type {
   }
 }
 
+/// A property in a JSON Schema object
+pub type Property {
+  Property(
+    name: String,
+    property_type: Type,
+    is_required: Bool,
+    description: option.Option(String),
+    constraints: List(Constraint),
+  )
+}
+
+/// Additional properties configuration for object types
+pub type AdditionalProperties {
+  /// Allow any additional properties (JSON Schema default behavior)
+  /// This is the default and will omit the additionalProperties field from the schema
+  AllowAny
+  /// Explicitly allow any additional properties (outputs "additionalProperties": true)
+  AllowExplicit
+  /// Disallow any additional properties
+  Disallow
+  /// Additional properties must conform to the specified schema
+  Schema(Type)
+}
+
+// Property builders
+/// Creates a property with the specified name and type
+/// Properties are required by default
+pub fn prop(name: String, property_type: Type) -> Property {
+  Property(
+    name: name,
+    property_type: property_type,
+    is_required: True,
+    description: option.None,
+    constraints: [],
+  )
+}
+
+/// Makes a property optional (not required in the schema)
+pub fn optional(property: Property) -> Property {
+  Property(..property, is_required: False)
+}
+
+/// Adds a description to a property for documentation purposes
+pub fn description(property: Property, desc: String) -> Property {
+  Property(..property, description: option.Some(desc))
+}
+
+/// Adds an enum constraint to a property that restricts values to a fixed set
+/// Example: prop("color", string()) |> enum(enum_strings(["red", "green", "blue"]))
+pub fn enum(property: Property, values: List(json.Json)) -> Property {
+  let new_constraint = Enum(values: values)
+  Property(..property, constraints: [new_constraint, ..property.constraints])
+}
+
+/// Adds a pattern constraint to a property that restricts values to match a regex pattern
+/// Example: prop("phone", string()) |> pattern("^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$")
+pub fn pattern(property: Property, regex: String) -> Property {
+  let new_constraint = Pattern(regex: regex)
+  Property(..property, constraints: [new_constraint, ..property.constraints])
+}
+
 fn additional_properties_to_json(
   add_props: AdditionalProperties,
 ) -> List(#(String, json.Json)) {
   case add_props {
     AllowAny -> []
-    // Omit the field entirely (JSON Schema default)
+    // Omit the field entirely (JSON Schema Draft 7 default)
     AllowExplicit -> [#("additionalProperties", json.bool(True))]
     Disallow -> [#("additionalProperties", json.bool(False))]
     Schema(schema_type) -> [
