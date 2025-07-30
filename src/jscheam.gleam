@@ -74,6 +74,13 @@ pub fn enum(property: Property, values: List(json.Json)) -> Property {
   Property(..property, constraints: [new_constraint, ..property.constraints])
 }
 
+/// Adds a pattern constraint to a property that restricts values to match a regex pattern
+/// Example: prop("phone", string()) |> pattern("^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$")
+pub fn pattern(property: Property, regex: String) -> Property {
+  let new_constraint = Pattern(regex: regex)
+  Property(..property, constraints: [new_constraint, ..property.constraints])
+}
+
 /// Creates an object type with the specified properties
 /// By default allows any additional properties (JSON Schema default behavior - omits the field)
 pub fn object(properties: List(Property)) -> Type {

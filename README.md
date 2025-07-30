@@ -181,7 +181,6 @@ let json_schema = jscheam.to_json(profile_schema) |> json.to_string()
 ### Restrictions
 
 - **String restrictions**:
-  - `pattern(regex)` - Regular expression pattern validation
   - `format(format)` - Format validation (email, uri, date-time, etc.)
 - **Number restrictions**:
   - `minimum(n)` / `maximum(n)` - Value range constraints
