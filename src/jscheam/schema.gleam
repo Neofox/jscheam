@@ -1,36 +1,31 @@
 import gleam/json
 import gleam/list
 import gleam/option
-import jscheam/property.{
-  type AdditionalProperties, type Constraint, type Property, type Type, AllowAny,
-  AllowExplicit, Array, Boolean, Disallow, Enum, Float, Integer, Null, Object,
-  Pattern, Property, Schema, String, Union,
+
+/// Constraints that can be applied to properties
+pub type Constraint {
+  /// Restrict values to a fixed set of values (can be any JSON value)
+  Enum(values: List(json.Json))
+  /// Pattern constraint using regex
+  Pattern(regex: String)
 }
 
-// Property builders
-/// Creates a property with the specified name and type
-/// Properties are required by default
-pub fn prop(name: String, property_type: Type) -> Property {
-  Property(
-    name: name,
-    property_type: property_type,
-    is_required: True,
-    description: option.None,
-    constraints: [],
+/// A type definition for JSON Schema
+pub type Type {
+  Integer
+  String
+  Boolean
+  Float
+  Null
+  Object(
+    properties: List(Property),
+    additional_properties: AdditionalProperties,
   )
+  Array(Type)
+  /// Union type for multiple allowed types (e.g., ["string", "null"])
+  Union(List(Type))
 }
 
-/// Makes a property optional (not required in the schema)
-pub fn optional(property: Property) -> Property {
-  Property(..property, is_required: False)
-}
-
-/// Adds a description to a property for documentation purposes
-pub fn description(property: Property, desc: String) -> Property {
-  Property(..property, description: option.Some(desc))
-}
-
-// Type builders
 /// Creates a string type for JSON Schema
 pub fn string() -> Type {
   String
@@ -67,6 +62,93 @@ pub fn union(types: List(Type)) -> Type {
   Union(types)
 }
 
+/// Creates an object type with the specified properties
+/// By default allows any additional properties (JSON Schema default behavior - omits the field)
+pub fn object(properties: List(Property)) -> Type {
+  Object(properties: properties, additional_properties: AllowAny)
+}
+
+/// Update an object type to allow any additional properties
+/// Explicitly allows any additional properties (outputs "additionalProperties": true)
+pub fn allow_additional_props(object_type: Type) -> Type {
+  case object_type {
+    Object(properties: props, additional_properties: _) ->
+      Object(properties: props, additional_properties: AllowExplicit)
+    _ -> object_type
+  }
+}
+
+/// Update an object type to disallow additional properties
+/// Disallows additional properties (outputs "additionalProperties": false)
+pub fn disallow_additional_props(object_type: Type) -> Type {
+  case object_type {
+    Object(properties: props, additional_properties: _) ->
+      Object(properties: props, additional_properties: Disallow)
+    _ -> object_type
+  }
+}
+
+/// Update an object type to constrain additional properties to a specific schema
+/// Example: object([prop("name", string())]) |> constrain_additional_props(string())
+/// This will set "additionalProperties" to the specified schema type
+pub fn constrain_additional_props(object_type: Type, schema: Type) -> Type {
+  case object_type {
+    Object(properties: props, additional_properties: _) ->
+      Object(properties: props, additional_properties: Schema(schema))
+    _ -> object_type
+  }
+}
+
+/// A property in a object type
+/// Represents a field in an object with a name, type, and optional constraints
+pub type Property {
+  Property(
+    name: String,
+    property_type: Type,
+    is_required: Bool,
+    description: option.Option(String),
+    constraints: List(Constraint),
+  )
+}
+
+/// Additional properties configuration for object types
+pub type AdditionalProperties {
+  /// Allow any additional properties (JSON Schema Draft 7 default behavior)
+  /// This is the default and will omit the additionalProperties field from the schema
+  AllowAny
+  /// Explicitly allow any additional properties (outputs "additionalProperties": true)
+  AllowExplicit
+  /// Disallow any additional properties
+  Disallow
+  /// Additional properties must conform to the specified schema
+  Schema(Type)
+}
+
+// Property builders
+/// Creates a property with the specified name and type
+/// Properties are required by default
+pub fn prop(name: String, property_type: Type) -> Property {
+  Property(
+    name: name,
+    property_type: property_type,
+    is_required: True,
+    description: option.None,
+    constraints: [],
+  )
+}
+
+/// Makes a property optional (not required in the schema)
+/// Example: object([prop("name", string()) |> optional()])
+pub fn optional(property: Property) -> Property {
+  Property(..property, is_required: False)
+}
+
+/// Adds a description to a property for documentation purposes
+/// Example: prop("name", string()) |> description("The name of the person")
+pub fn description(property: Property, desc: String) -> Property {
+  Property(..property, description: option.Some(desc))
+}
+
 /// Adds an enum constraint to a property that restricts values to a fixed set
 /// Example: prop("color", string()) |> enum(enum_strings(["red", "green", "blue"]))
 pub fn enum(property: Property, values: List(json.Json)) -> Property {
@@ -81,45 +163,12 @@ pub fn pattern(property: Property, regex: String) -> Property {
   Property(..property, constraints: [new_constraint, ..property.constraints])
 }
 
-/// Creates an object type with the specified properties
-/// By default allows any additional properties (JSON Schema default behavior - omits the field)
-pub fn object(properties: List(Property)) -> Type {
-  Object(properties: properties, additional_properties: AllowAny)
-}
-
-/// Explicitly allows any additional properties (outputs "additionalProperties": true)
-pub fn allow_additional_props(object_type: Type) -> Type {
-  case object_type {
-    Object(properties: props, additional_properties: _) ->
-      Object(properties: props, additional_properties: AllowExplicit)
-    _ -> object_type
-  }
-}
-
-/// Disallows additional properties (outputs "additionalProperties": false)
-pub fn disallow_additional_props(object_type: Type) -> Type {
-  case object_type {
-    Object(properties: props, additional_properties: _) ->
-      Object(properties: props, additional_properties: Disallow)
-    _ -> object_type
-  }
-}
-
-/// Constrains additional properties to conform to the specified schema
-pub fn constrain_additional_props(object_type: Type, schema: Type) -> Type {
-  case object_type {
-    Object(properties: props, additional_properties: _) ->
-      Object(properties: props, additional_properties: Schema(schema))
-    _ -> object_type
-  }
-}
-
 fn additional_properties_to_json(
   add_props: AdditionalProperties,
 ) -> List(#(String, json.Json)) {
   case add_props {
+    // Omit the field entirely (JSON Schema Draft 7 default equivalent to "additionalProperties": true)
     AllowAny -> []
-    // Omit the field entirely (JSON Schema default)
     AllowExplicit -> [#("additionalProperties", json.bool(True))]
     Disallow -> [#("additionalProperties", json.bool(False))]
     Schema(schema_type) -> [
@@ -273,6 +322,7 @@ fn fields_to_required(fields: List(Property)) -> json.Json {
 
 /// Converts a Type to a JSON Schema document
 /// This is the main function to generate JSON Schema from your type definitions
+/// Example: object([prop("name", string()), prop("age", integer())]) |> to_json()
 pub fn to_json(object_type: Type) -> json.Json {
   type_to_json_value(object_type)
 }

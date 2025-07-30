@@ -1,19 +1,18 @@
 import gleam/json
 import gleam/string
 import gleeunit/should
-import jscheam
-import jscheam/property.{Enum, Pattern, Property}
+import jscheam/schema.{Enum, Pattern, Property}
 
 // Test enum with string base type
 pub fn enum_string_test() {
   let schema =
-    jscheam.object([
-      jscheam.prop("units", jscheam.string())
-      |> jscheam.enum([json.string("celsius"), json.string("fahrenheit")])
-      |> jscheam.description("Units the temperature will be returned in."),
+    schema.object([
+      schema.prop("units", schema.string())
+      |> schema.enum([json.string("celsius"), json.string("fahrenheit")])
+      |> schema.description("Units the temperature will be returned in."),
     ])
 
-  let json = jscheam.to_json(schema) |> json.to_string()
+  let json = schema.to_json(schema) |> json.to_string()
 
   string.contains(json, "\"type\":\"object\"") |> should.be_true()
   string.contains(json, "\"units\":{") |> should.be_true()
@@ -36,8 +35,8 @@ pub fn enum_constraint_test() {
     json.string("blue"),
   ]
   let property =
-    jscheam.prop("color", jscheam.string())
-    |> jscheam.enum(expected_values)
+    schema.prop("color", schema.string())
+    |> schema.enum(expected_values)
 
   // Test that the constraint was applied
   let Property(_name, _type, _required, _description, constraints) = property
@@ -58,16 +57,16 @@ pub fn enum_mixed_types_test() {
   ]
 
   let schema =
-    jscheam.object([
-      jscheam.prop(
+    schema.object([
+      schema.prop(
         "status",
-        jscheam.union([jscheam.string(), jscheam.null(), jscheam.integer()]),
+        schema.union([schema.string(), schema.null(), schema.integer()]),
       )
-      |> jscheam.enum(mixed_values)
-      |> jscheam.description("Traffic light status with special values"),
+      |> schema.enum(mixed_values)
+      |> schema.description("Traffic light status with special values"),
     ])
 
-  let json = jscheam.to_json(schema) |> json.to_string()
+  let json = schema.to_json(schema) |> json.to_string()
 
   string.contains(json, "\"type\":\"object\"") |> should.be_true()
   string.contains(json, "\"status\":{") |> should.be_true()
@@ -87,14 +86,14 @@ pub fn pattern_constraint_test() {
   let phone_regex = "^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$"
 
   let schema =
-    jscheam.object([
-      jscheam.prop("phone", jscheam.string())
-      |> jscheam.pattern(phone_regex)
-      |> jscheam.description("Phone number in US format"),
+    schema.object([
+      schema.prop("phone", schema.string())
+      |> schema.pattern(phone_regex)
+      |> schema.description("Phone number in US format"),
     ])
-    |> jscheam.disallow_additional_props()
+    |> schema.disallow_additional_props()
 
-  let json = jscheam.to_json(schema) |> json.to_string()
+  let json = schema.to_json(schema) |> json.to_string()
 
   string.contains(json, "\"type\":\"object\"") |> should.be_true()
   string.contains(json, "\"phone\":{") |> should.be_true()
@@ -115,8 +114,8 @@ pub fn pattern_constraint_application_test() {
   let email_regex = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
 
   let property =
-    jscheam.prop("email", jscheam.string())
-    |> jscheam.pattern(email_regex)
+    schema.prop("email", schema.string())
+    |> schema.pattern(email_regex)
 
   // Test that the constraint was applied
   let Property(_name, _type, _required, _description, constraints) = property
@@ -136,14 +135,14 @@ pub fn multiple_constraints_test() {
   ]
 
   let schema =
-    jscheam.object([
-      jscheam.prop("color", jscheam.string())
-      |> jscheam.pattern(color_regex)
-      |> jscheam.enum(color_values)
-      |> jscheam.description("Hex color code from predefined set"),
+    schema.object([
+      schema.prop("color", schema.string())
+      |> schema.pattern(color_regex)
+      |> schema.enum(color_values)
+      |> schema.description("Hex color code from predefined set"),
     ])
 
-  let json = jscheam.to_json(schema) |> json.to_string()
+  let json = schema.to_json(schema) |> json.to_string()
 
   string.contains(json, "\"type\":\"string\"") |> should.be_true()
   string.contains(json, "\"pattern\":\"^#[0-9a-fA-F]{6}$\"") |> should.be_true()
@@ -159,12 +158,12 @@ pub fn multiple_constraints_test() {
 // Test simple pattern constraint output format
 pub fn simple_pattern_output_test() {
   let schema =
-    jscheam.object([
-      jscheam.prop("test", jscheam.string())
-      |> jscheam.pattern("^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$"),
+    schema.object([
+      schema.prop("test", schema.string())
+      |> schema.pattern("^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$"),
     ])
 
-  let json_string = jscheam.to_json(schema) |> json.to_string()
+  let json_string = schema.to_json(schema) |> json.to_string()
 
   // Should produce output similar to your example
   string.contains(json_string, "\"type\":\"string\"") |> should.be_true()

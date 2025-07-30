@@ -2,7 +2,7 @@ import gleam/json
 import gleam/string
 import gleeunit
 import gleeunit/should
-import jscheam
+import jscheam/schema
 
 pub fn main() -> Nil {
   gleeunit.main()
@@ -11,12 +11,12 @@ pub fn main() -> Nil {
 // Test default additional properties behavior (allow any - omit field)
 pub fn additional_properties_test() {
   let schema_default =
-    jscheam.object([
-      jscheam.prop("name", jscheam.string()),
-      jscheam.prop("age", jscheam.integer()) |> jscheam.optional(),
+    schema.object([
+      schema.prop("name", schema.string()),
+      schema.prop("age", schema.integer()) |> schema.optional(),
     ])
 
-  let json_default = jscheam.to_json(schema_default) |> json.to_string()
+  let json_default = schema.to_json(schema_default) |> json.to_string()
 
   // Should NOT contain additionalProperties field (defaults to true)
   string.contains(json_default, "additionalProperties") |> should.be_false()
@@ -25,10 +25,10 @@ pub fn additional_properties_test() {
 // Test additional properties with schema constraint
 pub fn additional_properties_with_schema_test() {
   let schema =
-    jscheam.object([jscheam.prop("name", jscheam.string())])
-    |> jscheam.constrain_additional_props(jscheam.string())
+    schema.object([schema.prop("name", schema.string())])
+    |> schema.constrain_additional_props(schema.string())
 
-  let json = jscheam.to_json(schema) |> json.to_string()
+  let json = schema.to_json(schema) |> json.to_string()
 
   string.contains(json, "\"additionalProperties\":{\"type\":\"string\"}")
   |> should.be_true()
@@ -37,10 +37,10 @@ pub fn additional_properties_with_schema_test() {
 // Test strict additional properties (false)
 pub fn additional_properties_strict_test() {
   let schema =
-    jscheam.object([jscheam.prop("name", jscheam.string())])
-    |> jscheam.disallow_additional_props()
+    schema.object([schema.prop("name", schema.string())])
+    |> schema.disallow_additional_props()
 
-  let json = jscheam.to_json(schema) |> json.to_string()
+  let json = schema.to_json(schema) |> json.to_string()
 
   string.contains(json, "\"additionalProperties\":false") |> should.be_true()
 }
@@ -48,10 +48,10 @@ pub fn additional_properties_strict_test() {
 // Test explicit additional properties (true)
 pub fn additional_properties_explicit_test() {
   let schema =
-    jscheam.object([jscheam.prop("name", jscheam.string())])
-    |> jscheam.allow_additional_props()
+    schema.object([schema.prop("name", schema.string())])
+    |> schema.allow_additional_props()
 
-  let json = jscheam.to_json(schema) |> json.to_string()
+  let json = schema.to_json(schema) |> json.to_string()
 
   string.contains(json, "\"additionalProperties\":true") |> should.be_true()
 }
@@ -59,13 +59,13 @@ pub fn additional_properties_explicit_test() {
 // Test optional properties
 pub fn optional_property_test() {
   let schema =
-    jscheam.object([
-      jscheam.prop("name", jscheam.string()),
-      jscheam.prop("bio", jscheam.string()) |> jscheam.optional(),
+    schema.object([
+      schema.prop("name", schema.string()),
+      schema.prop("bio", schema.string()) |> schema.optional(),
     ])
-    |> jscheam.disallow_additional_props()
+    |> schema.disallow_additional_props()
 
-  let json = jscheam.to_json(schema) |> json.to_string()
+  let json = schema.to_json(schema) |> json.to_string()
 
   string.contains(json, "\"name\":{\"type\":\"string\"}") |> should.be_true()
   string.contains(json, "\"bio\":{\"type\":\"string\"}") |> should.be_true()
@@ -75,15 +75,15 @@ pub fn optional_property_test() {
 // Test property descriptions
 pub fn description_test() {
   let schema =
-    jscheam.object([
-      jscheam.prop("name", jscheam.string())
-        |> jscheam.description("User's full name"),
-      jscheam.prop("age", jscheam.integer())
-        |> jscheam.description("User's age in years"),
+    schema.object([
+      schema.prop("name", schema.string())
+        |> schema.description("User's full name"),
+      schema.prop("age", schema.integer())
+        |> schema.description("User's age in years"),
     ])
-    |> jscheam.disallow_additional_props()
+    |> schema.disallow_additional_props()
 
-  let json = jscheam.to_json(schema) |> json.to_string()
+  let json = schema.to_json(schema) |> json.to_string()
 
   string.contains(json, "\"description\":\"User's full name\"")
   |> should.be_true()
@@ -92,14 +92,14 @@ pub fn description_test() {
 // Test chaining optional and description
 pub fn chained_modifiers_test() {
   let schema =
-    jscheam.object([
-      jscheam.prop("nickname", jscheam.string())
-      |> jscheam.optional()
-      |> jscheam.description("Optional user nickname"),
+    schema.object([
+      schema.prop("nickname", schema.string())
+      |> schema.optional()
+      |> schema.description("Optional user nickname"),
     ])
-    |> jscheam.disallow_additional_props()
+    |> schema.disallow_additional_props()
 
-  let json = jscheam.to_json(schema) |> json.to_string()
+  let json = schema.to_json(schema) |> json.to_string()
 
   string.contains(json, "\"required\":[]") |> should.be_true()
   string.contains(json, "\"description\":\"Optional user nickname\"")
