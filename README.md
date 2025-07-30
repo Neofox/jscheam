@@ -7,6 +7,22 @@ A Gleam library for generating JSON Schema documents (Draft 7 compliant).
 I looked for a simple way to create JSON schemas in Gleam but every things I tried where either outdated or incomplete. This library was born out of that need.
 This library provides a fluent API for building JSON schemas programmatically, making it easy to create validation schemas for APIs, configuration files, and data structures.
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Basic Types](#basic-types)
+  - [Object Schemas](#object-schemas)
+  - [Optional Properties and Descriptions](#optional-properties-and-descriptions)
+  - [Arrays](#arrays)
+  - [Union Types](#union-types)
+  - [Constraints](#constraints)
+  - [Nested Objects](#nested-objects)
+- [TODO: Future Features](#todo-future-features)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Installation
 
 ```sh
@@ -128,6 +144,126 @@ let json_schema = jscheam.to_json(tags_schema) |> json.to_string()
 // }
 ```
 
+### Union Types
+
+Union types allow a property to accept multiple types.
+Some API require all fields to be required (no optional fields), so the only way to add nullability is to use union types.
+
+```gleam
+import jscheam
+import gleam/json
+
+// Simple union: string or null
+let nullable_string_schema = jscheam.union([jscheam.string(), jscheam.null()])
+
+// Used in an object
+let user_schema = jscheam.object([
+  jscheam.prop("name", jscheam.string()),
+  jscheam.prop("nickname", jscheam.union([jscheam.string(), jscheam.null()]))
+    |> jscheam.description("Optional nickname, can be string or null")
+])
+
+let json_schema = jscheam.to_json(user_schema) |> json.to_string()
+// Result: {
+//   "type": "object",
+//   "properties": {
+//     "name": {"type": "string"},
+//     "nickname": {
+//       "type": ["string", "null"],
+//       "description": "Optional nickname, can be string or null"
+//     }
+//   },
+//   "required": ["name", "nickname"]
+// }
+```
+
+### Constraints
+
+Constraints allow you to add validation rules to your schema properties. jscheam supports enum and pattern constraints with more to come in the future.
+
+#### Enum Constraints
+
+Enum constraints restrict values to a fixed set of allowed values. It uses the `json` module to define the allowed values. as enum values can be any valid JSON type (string, number, boolean, null, ...)
+
+```gleam
+import jscheam
+import gleam/json
+
+// String enum
+let color_schema = jscheam.object([
+  jscheam.prop("color", jscheam.string())
+  |> jscheam.enum([
+    json.string("red"),
+    json.string("green"), 
+    json.string("blue")
+  ])
+  |> jscheam.description("Primary colors only")
+])
+
+// Mixed type enum with union
+let status_schema = jscheam.object([
+  jscheam.prop("status", jscheam.union([jscheam.string(), jscheam.null(), jscheam.integer()]))
+  |> jscheam.enum([
+    json.string("active"),
+    json.string("inactive"),
+    json.null(),
+    json.int(42)
+  ])
+  |> jscheam.description("Status with mixed types")
+])
+
+let json_schema = jscheam.to_json(color_schema) |> json.to_string()
+// Result: {
+//   "type": "object",
+//   "properties": {
+//     "color": {
+//       "type": "string",
+//       "enum": ["red", "green", "blue"],
+//       "description": "Primary colors only"
+//     }
+//   },
+//   "required": ["color"]
+// }
+```
+
+#### Pattern Constraints
+
+Pattern constraints use regular expressions to validate string values:
+
+```gleam
+import jscheam
+import gleam/json
+
+// Email validation
+let user_schema = jscheam.object([
+  jscheam.prop("email", jscheam.string())
+  |> jscheam.pattern("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
+  |> jscheam.description("Valid email address"),
+  
+  jscheam.prop("phone", jscheam.string())
+  |> jscheam.pattern("^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$")
+  |> jscheam.description("Phone number in US format")
+])
+
+let json_schema = jscheam.to_json(user_schema) |> json.to_string()
+// Result: {
+//   "type": "object", 
+//   "properties": {
+//     "email": {
+//       "type": "string",
+//       "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+//       "description": "Valid email address"
+//     },
+//     "phone": {
+//       "type": "string", 
+//       "pattern": "^(\\([0-9]{3}\\))?[0-9]{3}-[0-9]{4}$",
+//       "description": "Phone number in US format"
+//     }
+//   },
+//   "required": ["email", "phone"]
+// }
+```
+
 ### Nested Objects
 
 ```gleam
@@ -180,6 +316,10 @@ let json_schema = jscheam.to_json(profile_schema) |> json.to_string()
 
 ### Restrictions
 
+- **Conditional Schema Validation**
+  - `dependentRequired` - conditionally requires that certain properties must be present based on the presence of other properties
+  - `dependentSchemas` - conditionally applies different schemas based on the presence of other properties
+  - `if - then - else` - conditional schema validation based on the value of a property
 - **String restrictions**:
   - `format(format)` - Format validation (email, uri, date-time, etc.)
 - **Number restrictions**:
